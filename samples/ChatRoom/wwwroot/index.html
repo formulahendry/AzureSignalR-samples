@@ -6,11 +6,20 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <link href="css/site.css" rel="stylesheet" />
     <title>Azure SignalR Group Chat</title>
 </head>
 <body>
-    <h2 class="text-center" style="margin-top: 0; padding-top: 30px; padding-bottom: 30px;">Azure SignalR Group Chat</h2>
+    <div id="dialog-form">
+        <form>
+            <fieldset>
+                <input type="text" name="name" id="name">
+            </fieldset>
+        </form>
+        <div id="validateTips" style="color:red"></div>
+    </div>
+    <h2 class="text-center" style="margin-top: 0; padding-top: 30px; padding-bottom: 30px;">Chat Room</h2>
     <div class="container" style="height: calc(100% - 110px);">
         <div id="messages" style="background-color: whitesmoke; "></div>
         <div style="width: 100%; border-left-style: ridge; border-right-style: ridge;">
@@ -37,6 +46,9 @@
     <!--Reference the SignalR library. -->
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@aspnet/signalr@1.0.0/dist/browser/signalr.min.js"></script>
 
+    <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+
     <!--Add script to update the page and send messages.-->
     <script type="text/javascript">
         document.addEventListener('DOMContentLoaded', function () {
@@ -45,20 +57,59 @@
                 return Math.random().toString(36).substring(2, 10);
             }
 
-            // Get the user name and store it to prepend to messages.
-            var username = generateRandomName();
-            var promptMessage = 'Enter your name:';
-            do {
-                username = prompt(promptMessage, username);
-                if (!username || username.startsWith('_') || username.indexOf('<') > -1 || username.indexOf('>') > -1) {
-                    username = '';
-                    promptMessage = 'Invalid input. Enter your name:';
-                }
-            } while(!username)
-
-            // Set initial focus to message input box.
+            var dialog, username;
+            var hasInputtedUsername = false;
             var messageInput = document.getElementById('message');
-            messageInput.focus();
+            $("#name").val(generateRandomName());
+            var opt = {
+                    autoOpen: true,
+                    modal: true,
+                    width: 210,
+                    title: 'Enter your name',
+                    buttons: {
+                        "OK": submitUsername,
+                    },
+                    open: function(event, ui) {
+                        $(".ui-dialog-titlebar-close", ui.dialog | ui).hide();
+                    },
+                    beforeClose: function(){
+                        return hasInputtedUsername;
+                    }
+                };
+            dialog = $( '#dialog-form' ).dialog(opt);
+            form = dialog.find( "form" ).on( "submit", function( event ) {
+                event.preventDefault();
+                submitUsername();
+            });
+            
+            function submitUsername() {
+                username = $("#name").val();
+                if (username && username.length >=3 && username.length <= 30) {
+                    hasInputtedUsername = true;
+                    dialog.dialog( "close" );
+                    initialize();
+                } else {
+                    username = "";
+                    $("#validateTips").text("Length of name must between 3 and 30.");
+                }
+            }
+            
+            function initialize() {
+                var connection = new signalR.HubConnectionBuilder()
+                                        .withUrl('/chat')
+                                        .build();
+                bindConnectionMessage(connection);
+                connection.start()
+                    .then(function () {
+                        onConnected(connection);
+                    })
+                    .catch(function (error) {
+                        console.error(error.message);
+                    });
+
+                // Set initial focus to message input box.
+                messageInput.focus();
+            }
 
             function createMessageEntry(encodedName, encodedMsg) {
                 var entry = document.createElement('div');
@@ -139,17 +190,7 @@
                 modal.style = 'display: block;';
             }
 
-            var connection = new signalR.HubConnectionBuilder()
-                                        .withUrl('/chat')
-                                        .build();
-            bindConnectionMessage(connection);
-            connection.start()
-                .then(function () {
-                    onConnected(connection);
-                })
-                .catch(function (error) {
-                    console.error(error.message);
-                });
+            
         });
     </script>
 </body>
