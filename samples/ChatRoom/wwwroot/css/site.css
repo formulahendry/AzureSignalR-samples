@@ -80,3 +80,7 @@ textarea:focus {
     border-left: 10px solid #b2e281;
     margin: 15px 0;
 }
+
+.submit-button {
+    margin-right: 5px;
+}

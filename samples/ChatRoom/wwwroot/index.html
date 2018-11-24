@@ -28,8 +28,9 @@
                           placeholder="Type message and press Enter to send..."></textarea>
         </div>
         <div style="overflow: auto; border-style: ridge; border-top-style: hidden;">
-            <button class="btn-warning pull-right" id="echo">Echo</button>
-            <button class="btn-success pull-right" id="sendmessage">Send</button>
+            <button class="submit-button btn-warning pull-right" id="echo">Echo</button>
+            <button class="submit-button btn-info pull-right" id="chatWithBot">Chat with Bot</button>
+            <button class="submit-button btn-success pull-right" id="sendmessage">Send</button>
         </div>
     </div>
     <div class="modal alert alert-danger fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
@@ -153,16 +154,37 @@
             function onConnected(connection) {
                 console.log('connection started');
                 connection.send('broadcastMessage', '_SYSTEM_', username + ' JOINED');
-                document.getElementById('sendmessage').addEventListener('click', function (event) {
+                document.getElementById('sendmessage').addEventListener('click', async function (event) {
                     // Call the broadcastMessage method on the hub.
                     if (messageInput.value) {
                         connection.send('broadcastMessage', username, messageInput.value);
                     }
 
+                    var message = messageInput.value;    
+
                     // Clear text box and reset focus for next comment.
                     messageInput.value = '';
                     messageInput.focus();
                     event.preventDefault();
+
+                    if (message && message.startsWith('@ChatBot ')) {
+                        message = message.substring(9);
+                        const response = await fetch('https://bot-api.azurewebsites.net/proxy', {
+                            method: 'POST',
+                            body: `{"key":"7b979bdf8ed64ca4b652ba20c9dbace9","info":"${message}","userid":"123456"}`,
+                            headers:{
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        const responseJson = await response.json();
+                        connection.send('broadcastMessage', 'ChatBot', responseJson.text);
+                        if (responseJson.url) {
+                            connection.send('broadcastMessage', 'ChatBot', responseJson.url);
+                        } 
+                        if (responseJson.list) {
+                            connection.send('broadcastMessage', 'ChatBot', JSON.stringify(responseJson.list));
+                        }
+                    }
                 });
                 document.getElementById('message').addEventListener('keypress', function (event) {
                     if (event.keyCode === 13) {
@@ -179,6 +201,12 @@
                     messageInput.value = '';
                     messageInput.focus();
                     event.preventDefault();
+                });
+                document.getElementById('chatWithBot').addEventListener('click', function (event) {
+                    messageInput.value = '@ChatBot ' + messageInput.value;
+                    messageInput.focus();
+                    event.preventDefault();
+                    document.getElementById('sendmessage').click();
                 });
             }
 
